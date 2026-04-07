@@ -1,0 +1,27 @@
+name: LookUp
+options:
+  bundleIdPrefix: com.lookup
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.2"
+settings:
+  SWIFT_VERSION: "5.9"
+  DEVELOPMENT_TEAM: ""
+targets:
+  LookUp:
+    type: application
+    platform: iOS
+    sources:
+      - LookUp
+    settings:
+      INFOPLIST_FILE: LookUp/Resources/Info.plist
+      PRODUCT_BUNDLE_IDENTIFIER: com.lookup.app
+      TARGETED_DEVICE_FAMILY: "1"
+    dependencies: []
+  LookUpTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - LookUpTests
+    dependencies:
+      - target: LookUp

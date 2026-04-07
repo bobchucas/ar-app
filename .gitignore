@@ -1,0 +1,24 @@
+# Xcode
+ios/LookUp.xcodeproj/
+ios/*.xcworkspace/
+ios/build/
+*.xcuserdata
+DerivedData/
+
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+
+# Data (large files)
+backend/data/dem/*.tif
+backend/data/dem/*.tiff
+backend/data/gazetteer/*.csv
+backend/data/gazetteer/*.db
+backend/data/gazetteer/*.db-shm
+backend/data/gazetteer/*.db-wal
+backend/data/gazetteer/*.zip
+
+# OS
+.DS_Store
