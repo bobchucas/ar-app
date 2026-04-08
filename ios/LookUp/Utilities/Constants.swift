@@ -3,7 +3,7 @@ import Foundation
 enum Constants {
     /// Backend API base URL. For local dev, use your Mac's local network IP.
     /// Change this to your actual IP when running on a physical device.
-    static let backendBaseURL = "http://192.168.4.93:8000"
+    static let backendBaseURL = "http://100.87.237.56:8200"
 
     /// OpenSky polling interval in seconds.
     static let openSkyPollInterval: TimeInterval = 10

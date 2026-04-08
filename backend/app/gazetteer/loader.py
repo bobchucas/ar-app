@@ -5,7 +5,12 @@ import sqlite3
 import zipfile
 from pathlib import Path
 
+from pyproj import Transformer
+
 from app.config import GAZETTEER_DIR, GAZETTEER_DB
+
+# BNG (EPSG:27700) -> WGS84 (EPSG:4326) transformer
+_bng_to_wgs84 = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy=True)
 
 # OS Open Names feature types we care about
 OS_RELEVANT_TYPES = {
@@ -60,29 +65,43 @@ def init_db() -> sqlite3.Connection:
     return conn
 
 
+OS_OPEN_NAMES_HEADER = [
+    "ID", "NAMES_URI", "NAME1", "NAME1_LANG", "NAME2", "NAME2_LANG",
+    "TYPE", "LOCAL_TYPE", "GEOMETRY_X", "GEOMETRY_Y",
+    "MOST_DETAIL_VIEW_RES", "LEAST_DETAIL_VIEW_RES",
+    "MBR_XMIN", "MBR_YMIN", "MBR_XMAX", "MBR_YMAX",
+    "POSTCODE_DISTRICT", "POSTCODE_DISTRICT_URI",
+    "POPULATED_PLACE", "POPULATED_PLACE_URI", "POPULATED_PLACE_TYPE",
+    "DISTRICT_BOROUGH", "DISTRICT_BOROUGH_URI", "DISTRICT_BOROUGH_TYPE",
+    "COUNTY_UNITARY", "COUNTY_UNITARY_URI", "COUNTY_UNITARY_TYPE",
+    "REGION", "REGION_URI", "COUNTRY", "COUNTRY_URI",
+    "RELATED_SPATIAL_OBJECT", "SAME_AS_DBPEDIA", "SAME_AS_GEONAMES",
+]
+
+
 def load_os_open_names(conn: sqlite3.Connection, csv_path: Path) -> int:
     """Load OS Open Names CSV into the database.
 
-    OS Open Names CSV columns (header row):
-    ID, NAMES_URI, NAME1, NAME1_LANG, NAME2, NAME2_LANG,
-    TYPE, LOCAL_TYPE, GEOMETRY_X, GEOMETRY_Y, ...
-    (GEOMETRY_X/Y are British National Grid eastings/northings — we need lat/lon)
-
-    Actually, the download includes a "DATA" column format with
-    SAME_AS_DBPEDIA, POPULATED_PLACE, etc.
-
-    For the prototype, we use the CSV version which has
-    lat/lon in WGS84 if downloaded as the GeoPackage or
-    we convert from BNG.
-
-    Note: This loader expects pre-converted CSV with lat/lon columns.
-    Use the download script to handle conversion.
+    Handles both formats:
+    - Raw download CSVs (no header, BNG eastings/northings) — converts to WGS84
+    - Pre-converted CSVs with GEOMETRY_X_WGS84 / GEOMETRY_Y_WGS84 columns
     """
     count = 0
     cursor = conn.cursor()
 
     with open(csv_path, "r", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
+        # Peek at first line to detect if there's a header row
+        first_line = f.readline()
+        f.seek(0)
+
+        has_header = "LOCAL_TYPE" in first_line
+        if has_header:
+            reader = csv.DictReader(f)
+        else:
+            reader = csv.DictReader(f, fieldnames=OS_OPEN_NAMES_HEADER)
+
+        has_wgs84 = has_header and "GEOMETRY_X_WGS84" in first_line
+
         for row in reader:
             local_type = row.get("LOCAL_TYPE", "")
             if local_type not in OS_RELEVANT_LOCAL_TYPES:
@@ -93,8 +112,13 @@ def load_os_open_names(conn: sqlite3.Connection, csv_path: Path) -> int:
                 continue
 
             try:
-                lat = float(row["GEOMETRY_Y_WGS84"])
-                lon = float(row["GEOMETRY_X_WGS84"])
+                if has_wgs84:
+                    lat = float(row["GEOMETRY_Y_WGS84"])
+                    lon = float(row["GEOMETRY_X_WGS84"])
+                else:
+                    easting = float(row["GEOMETRY_X"])
+                    northing = float(row["GEOMETRY_Y"])
+                    lon, lat = _bng_to_wgs84.transform(easting, northing)
             except (KeyError, ValueError):
                 continue
 
